@@ -4,8 +4,8 @@ This python script gets the file **parousies.txt** and remove the duplicate mail
 
 RUN: 
 
-<code>
+```
 python remove_duplicates.py
-</code>
+```
 
 
