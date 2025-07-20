@@ -36,7 +36,7 @@
 
 ```sh
 https://github.com/iosifidis/myScripts.git
-cd myScripts
+cd myScripts/fedora_upgrade
 ```
 
 ### Βήμα 2: Παροχή Δικαιωμάτων Εκτέλεσης
@@ -125,7 +125,7 @@ Clone the repository to your computer or download the `.sh` files individually.
 
 ```sh
 https://github.com/iosifidis/myScripts.git
-cd myScripts
+cd myScripts/fedora_upgrade
 ```
 
 ### Step 2: Make Scripts Executable
