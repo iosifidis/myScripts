@@ -9,4 +9,4 @@
 
 ## ⚖️ LICENCE
 
-This work is distributed under the **GNU General Public License**. See the `LICENSE` file for more details.
+This work is distributed under the [**GNU General Public License**](https://www.gnu.org/licenses/gpl-3.0.html). See the `LICENSE` file for more details.
