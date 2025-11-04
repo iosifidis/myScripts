@@ -5,3 +5,8 @@
 - [Fedora upgrade script](fedora_upgrade): Bash scripts that automate the official Fedora Linux upgrade procedure and provide a menu for post-upgrade system cleanup.   
 - [Video trimmer with ffmpeg](ffmpeg_script): A straightforward, interactive Bash script for trimming video files directly from the terminal.   
 - [Simple Web File Downloader](downloader): This is a simple but powerful Python script that allows you to download all files of a specific type (e.g., `.mp3`, `.pdf`, `.jpg`) linked on a single webpage. You provide the URL, the file extension, and an optional folder name, and the script does the rest.   
+
+
+## ⚖️ LICENCE
+
+This work is distributed under the **GNU General Public License**. See the `LICENSE` file for more details.
