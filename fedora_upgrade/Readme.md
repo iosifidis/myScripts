@@ -35,7 +35,7 @@
 Κάντε κλώνο (clone) το αποθετήριο στον υπολογιστή σας ή κατεβάστε τα αρχεία `sh` ξεχωριστά.
 
 ```sh
-https://github.com/iosifidis/myScripts.git
+git clone https://github.com/iosifidis/myScripts.git
 cd myScripts/fedora_upgrade
 ```
 
