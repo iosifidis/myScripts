@@ -1,0 +1,85 @@
+---
+- name: Universal Linux System Restore
+  hosts: localhost
+  connection: local
+
+  vars:
+    backup_dir: "{{ ansible_user_dir }}/linux-backup"
+
+  tasks:
+    # --- 1. Αποκατάσταση Αποθετηρίων και Δικτύου ---
+    - name: Restore Repositories & Network (needs sudo)
+      become: yes
+      block:
+        - name: Restore Fedora Repos
+          when: ansible_facts['os_family'] == "RedHat"
+          ansible.builtin.copy:
+            src: "{{ backup_dir }}/repos/fedora/"
+            dest: /etc/yum.repos.d/
+
+        - name: Restore openSUSE Repos
+          when: ansible_facts['os_family'] == "Suse"
+          ansible.builtin.copy:
+            src: "{{ backup_dir }}/repos/suse/"
+            dest: /etc/zypp/repos.d/
+
+        - name: Restore Debian/Ubuntu Repos
+          when: ansible_facts['os_family'] == "Debian"
+          ansible.builtin.copy:
+            src: "{{ backup_dir }}/repos/debian/"
+            dest: /etc/apt/sources.list.d/
+
+        - name: Restore Wi-Fi Connections
+          ansible.posix.synchronize:
+            src: "{{ backup_dir }}/network_connections/"
+            dest: /etc/NetworkManager/system-connections/
+          
+        - name: Reload NetworkManager
+          ansible.builtin.systemd:
+            name: NetworkManager
+            state: reloaded
+
+    # --- 2. Εγκατάσταση Πακέτων ---
+    - name: Install Native Packages
+      become: yes
+      # Χρησιμοποιούμε το γενικό 'package' module!
+      ansible.builtin.package:
+        name: "{{ lookup('file', pkg_list_file).splitlines() }}"
+        state: present
+        update_cache: yes
+      vars:
+        # Ορίζουμε το σωστό αρχείο λίστας ανάλογα με το OS
+        pkg_list_file: >-
+          {% if ansible_facts['os_family'] == 'RedHat' %}{{ backup_dir }}/dnf_packages.list{%
+             elif ansible_facts['os_family'] == 'Suse' %}{{ backup_dir }}/zypper_packages.list{%
+             elif ansible_facts['os_family'] == 'Debian' %}{{ backup_dir }}/apt_packages.list{% endif %}
+      when: pkg_list_file is defined # Τρέχει μόνο αν βρεθεί το κατάλληλο αρχείο
+
+    # --- 3. Εγκατάσταση Flatpaks ---
+    - name: Install Flatpak Packages
+      when: "'flatpak_packages.list' in lookup('fileglob', backup_dir + '/*_packages.list', wantlist=True) | map('basename')"
+      block:
+        - name: Ensure Flathub remote exists
+          community.general.flatpak_remote:
+            name: flathub
+            state: present
+            flatpakrepo_url: https://flathub.org/repo/flathub.flatpakrepo
+
+        - name: Install Flatpaks from list
+          community.general.flatpak:
+            name: "{{ lookup('file', backup_dir + '/flatpak_packages.list').splitlines() }}"
+            state: present
+
+    # --- 4. Εγκατάσταση Snaps ---
+    - name: Install Snap Packages
+      become: yes
+      when: "'snap_packages.list' in all_package_lists"
+      ansible.builtin.snap:
+        name: "{{ lookup('file', backup_dir + '/snap_packages.list').splitlines() }}"
+        state: present
+
+    # --- 4. Αποκατάσταση Ρυθμίσεων Χρήστη ---
+    - name: Restore User Dotfiles
+      ansible.posix.synchronize:
+        src: "{{ backup_dir }}/home_settings/"
+        dest: "{{ ansible_user_dir }}/"

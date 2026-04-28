@@ -1,0 +1,63 @@
+---
+- name: Επαναφορά Ρυθμίσεων Συστήματος Fedora
+  hosts: localhost # Το τρέχουμε στο τοπικό μηχάνημα
+  connection: local # Δεν χρησιμοποιούμε SSH
+
+  vars:
+    # Ορίζουμε τη διαδρομή για τον φάκελο του backup
+    backup_dir: "{{ ansible_user_dir }}/fedora-backup"
+
+  tasks:
+    - name: 1. Επαναφορά Συνδέσεων Δικτύου
+      become: yes # Χρειαζόμαστε δικαιώματα διαχειριστή για αυτό
+      block:
+        - name: Αντιγραφή των αρχείων σύνδεσης του NetworkManager
+          ansible.posix.synchronize:
+            src: "{{ backup_dir }}/network_connections/"
+            dest: /etc/NetworkManager/system-connections/
+            rsync_opts:
+              - "--chown=root:root" # Βεβαιωνόμαστε για τον σωστό ιδιοκτήτη
+          
+        - name: Ενημέρωση του NetworkManager για τις νέες συνδέσεις
+          ansible.builtin.systemd:
+            name: NetworkManager
+            state: reloaded
+
+    - name: 2. Επαναφορά Αποθετηρίων (Repositories)
+      become: yes
+      block:
+        - name: Αντιγραφή των αρχείων .repo
+          ansible.builtin.copy:
+            src: "{{ backup_dir }}/yum.repos.d/"
+            dest: /etc/
+            owner: root
+            group: root
+            mode: '0644'
+
+        - name: Δημιουργία της cache του DNF
+          ansible.builtin.command: dnf makecache
+
+    - name: 3. Εγκατάσταση Πακέτων DNF
+      become: yes
+      ansible.builtin.dnf:
+        name: "{{ lookup('file', backup_dir + '/dnf_packages.list').splitlines() }}"
+        state: present
+
+    - name: 4. Εγκατάσταση Πακέτων Flatpak
+      block:
+        - name: Βεβαιωθείτε ότι υπάρχει το Flathub remote
+          community.general.flatpak_remote:
+            name: flathub
+            state: present
+            flatpakrepo_url: https://flathub.org/repo/flathub.flatpakrepo
+        
+        - name: Εγκατάσταση των εφαρμογών Flatpak από τη λίστα
+          community.general.flatpak:
+            name: "{{ lookup('file', backup_dir + '/flatpak_packages.list').splitlines() }}"
+            state: present
+
+    - name: 5. Επαναφορά Ρυθμίσεων Χρήστη (Dotfiles)
+      # Δεν χρειαζόμαστε sudo εδώ!
+      ansible.posix.synchronize:
+        src: "{{ backup_dir }}/home_settings/"
+        dest: "{{ ansible_user_dir }}/"
