@@ -17,7 +17,7 @@ set -e
 
 # --- Έλεγχος για δικαιώματα διαχειριστή (root) ---
 if [[ $EUID -ne 0 ]]; then
-   echo "Αυτό το σενάrio πρέπει να εκτελεστεί με δικαιώματα διαχειριστή (sudo)." 
+   echo "Αυτό το σενάριο πρέπει να εκτελεστεί με δικαιώματα διαχειριστή (sudo)." 
    exit 1
 fi
 
@@ -64,11 +64,11 @@ cleanup_retired_packages() {
     echo -e "${GREEN}Ο καθαρισμός των πακέτων που αποσύρθηκαν ολοκληρώθηκε.${NC}"
 }
 
-# 3. Αφαίρεση διπλότυπων πακέτων
+# 3. Αφαίρεση διπλότυπων πακέτων (Διορθωμένο για DNF5)
 remove_duplicates() {
     echo -e "\n${YELLOW}--- 3. Αφαίρεση Διπλότυπων Πακέτων ---${NC}"
     echo "Αναζήτηση για πακέτα που έχουν εγκατεστημένες πολλαπλές εκδόσεις..."
-    if ! dnf remove --duplicates; then
+    if ! dnf remove-duplicates -y; then
         echo "Δεν βρέθηκαν διπλότυπα ή η διαδικασία ακυρώθηκε."
     fi
     echo -e "${GREEN}Ο καθαρισμός διπλότυπων ολοκληρώθηκε.${NC}"
@@ -100,10 +100,42 @@ remove_old_kernels() {
 autoremove_packages() {
     echo -e "\n${YELLOW}--- 5. Αφαίρεση Ορφανών Πακέτων (Autoremove) ---${NC}"
     echo "Αυτή η ενέργεια θα αφαιρέσει πακέτα που εγκαταστάθηκαν ως εξαρτήσεις αλλά δεν χρειάζονται πλέον."
-    if ! dnf autoremove; then
+    if ! dnf autoremove -y; then
         echo "Δεν βρέθηκαν πακέτα για αφαίρεση ή η διαδικασία ακυρώθηκε."
     fi
     echo -e "${GREEN}Ο καθαρισμός ορφανών πακέτων ολοκληρώθηκε.${NC}"
+}
+
+# 6. Καθαρισμός παλιών GPG keys
+cleanup_gpg_keys() {
+    echo -e "\n${YELLOW}--- 6. Καθαρισμός Παλαιών GPG Κλειδιών ---${NC}"
+    echo "Εγκατάσταση του 'clean-rpm-gpg-pubkey'..."
+    dnf install -y clean-rpm-gpg-pubkey
+    echo "Εκκαθάριση παλαιών κλειδιών..."
+    clean-rpm-gpg-pubkey
+    echo -e "${GREEN}Ο καθαρισμός των παλαιών GPG κλειδιών ολοκληρώθηκε.${NC}"
+}
+
+# 7. Καθαρισμός σπασμένων symlinks
+cleanup_symlinks() {
+    echo -e "\n${YELLOW}--- 7. Καθαρισμός Σπασμένων Symlinks ---${NC}"
+    echo "Εγκατάσταση του 'symlinks'..."
+    dnf install -y symlinks
+    echo "Διαγραφή ορφανών/σπασμένων symlinks στο /usr..."
+    symlinks -rd /usr
+    echo -e "${GREEN}Ο καθαρισμός των σπασμένων symlinks ολοκληρώθηκε.${NC}"
+}
+
+# 8. Ανανέωση Rescue Kernel
+update_rescue_kernel() {
+    echo -e "\n${YELLOW}--- 8. Ανανέωση Rescue Kernel ---${NC}"
+    echo "Διαγραφή του παλιού rescue kernel..."
+    rm -f /boot/*rescue*
+    echo "Δημιουργία νέου rescue kernel..."
+    kernel-install add "$(uname -r)" "/lib/modules/$(uname -r)/vmlinuz"
+    echo "Εγκατάσταση του 'dracut-config-rescue' για μελλοντική αυτοματοποίηση..."
+    dnf install -y dracut-config-rescue
+    echo -e "${GREEN}Η ανανέωση του Rescue Kernel ολοκληρώθηκε.${NC}"
 }
 
 # --- Κύριο μενού ---
@@ -116,8 +148,11 @@ while true; do
     echo " 3. Αφαίρεση διπλότυπων πακέτων"
     echo " 4. Αφαίρεση παλαιών πυρήνων (kernels)"
     echo " 5. Αφαίρεση ορφανών πακέτων (autoremove)"
+    echo " 6. Καθαρισμός παλαιών GPG κλειδιών"
+    echo " 7. Καθαρισμός σπασμένων symlinks"
+    echo " 8. Ανανέωση Rescue Kernel"
     echo "-----------------------------------------------------"
-    echo " A. Εκτέλεση ΟΛΩΝ των παραπάνω βημάτων"
+    echo " A. Εκτέλεση ΟΛΩΝ των παραπάνω βημάτων (1-8)"
     echo " Q. Έξοδος"
     echo "====================================================="
     read -p "Επιλέξτε μια ενέργεια: " choice
@@ -128,6 +163,9 @@ while true; do
         3) remove_duplicates ;;
         4) remove_old_kernels ;;
         5) autoremove_packages ;;
+        6) cleanup_gpg_keys ;;
+        7) cleanup_symlinks ;;
+        8) update_rescue_kernel ;;
         [aA])
             echo -e "\n${YELLOW}Εκτέλεση όλων των βημάτων συντήρησης...${NC}"
             update_config_files
@@ -135,6 +173,9 @@ while true; do
             remove_duplicates
             remove_old_kernels
             autoremove_packages
+            cleanup_gpg_keys
+            cleanup_symlinks
+            update_rescue_kernel
             echo -e "\n${GREEN}Όλες οι εργασίες συντήρησης ολοκληρώθηκαν!${NC}"
             ;;
         [qQ])
